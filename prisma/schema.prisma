@@ -1,0 +1,44 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql" // Hum PostgreSQL pipeline use karenge
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. User/Founder Account Model
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  
+  // Relations: One user can have multiple integrated social channels
+  channels  Channel[]
+  posts     Post[]
+}
+
+// 2. Multi-Channel ID Framework (Handles separate platform hooks)
+model Channel {
+  id           String   @id @default(uuid())
+  platform     String   // "TWITTER", "LINKEDIN", "DISCORD"
+  platformId   String   // The unique ID provided by the specific social API
+  accessToken  String   // Auth token to securely push posts
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// 3. Automated Post Queue Array
+model Post {
+  id          String   @id @default(uuid())
+  rawPrompt   String   // The URL or description input by the founder
+  generatedAi String   // The generated content array stored as markdown/text
+  status      String   // "PENDING", "PUBLISHED", "FAILED"
+  scheduledAt DateTime
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
