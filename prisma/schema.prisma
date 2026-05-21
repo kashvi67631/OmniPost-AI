@@ -1,44 +1,62 @@
 // prisma/schema.prisma
+// OmniPost AI - Database Schema for PostgreSQL
 
 datasource db {
-  provider = "postgresql" // Hum PostgreSQL pipeline use karenge
+  provider = "postgresql"
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// 1. User/Founder Account Model
+// ============================================
+// 1. User Model - Founder/Account Management
+// ============================================
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String?
   createdAt DateTime @default(now())
   
-  // Relations: One user can have multiple integrated social channels
-  channels  Channel[]
-  posts     Post[]
+  // Relations
+  posts             Post[]
+  generatedContents GeneratedContent[]
 }
 
-// 2. Multi-Channel ID Framework (Handles separate platform hooks)
-model Channel {
-  id           String   @id @default(uuid())
-  platform     String   // "TWITTER", "LINKEDIN", "DISCORD"
-  platformId   String   // The unique ID provided by the specific social API
-  accessToken  String   // Auth token to securely push posts
-  
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+// ============================================
+// 2. Post Model - Content Queue & Distribution
+// ============================================
 
-// 3. Automated Post Queue Array
 model Post {
-  id          String   @id @default(uuid())
-  rawPrompt   String   // The URL or description input by the founder
-  generatedAi String   // The generated content array stored as markdown/text
-  status      String   // "PENDING", "PUBLISHED", "FAILED"
-  scheduledAt DateTime
+  id        String   @id @default(uuid())
+  prompt    String   // The URL or description input by the founder
+  platforms String   // JSON array of selected platforms: ["Twitter / X", "LinkedIn", "Discord"]
+  createdAt DateTime @default(now())
   
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  // Foreign key relation
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // One-to-one relation with generated content
+  generatedContent GeneratedContent?
+}
+
+// ============================================
+// 3. GeneratedContent Model - AI Output Storage
+// ============================================
+
+model GeneratedContent {
+  id            String   @id @default(uuid())
+  twitterThread String   // JSON array of tweet strings
+  linkedinPost  String   // Long-form LinkedIn post content
+  createdAt     DateTime @default(now())
+  
+  // Foreign key relation (one-to-one with Post)
+  postId        String   @unique
+  post          Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  // Back-relation to User (through Post)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

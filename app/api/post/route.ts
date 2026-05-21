@@ -178,17 +178,18 @@ console.log(
  * a founder submits a URL or description that will be processed by AI.
  *
  * Request Body:
- * - userId: string - The ID of the user creating the post
+ * - userId: string - The ID/email of the user creating the post
  * - rawPrompt: string - The URL or description input by the founder
+ * - channels: string[] - Array of selected platforms
  * - scheduledAt: string (ISO datetime) - When the post should be published
  *
  * Response:
- * - The created Post object with generated status as "PENDING"
+ * - The created Post object with generated content
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, rawPrompt, scheduledAt } = body;
+    const { userId, rawPrompt, scheduledAt, channels } = body;
 
     // Validate required fields
     if (!userId || !rawPrompt || !scheduledAt) {
@@ -201,71 +202,101 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user exists (only in database mode - skip in mock mode for flexibility)
-    if (prisma) {
-      const user = await db.user.findUnique({
-        where: { id: userId },
-      });
+    // Generate AI content for both modes
+    const generatedContent = generateMockAiContent(rawPrompt);
+    const isMockMode = !prisma;
 
-      if (!user) {
-        return NextResponse.json(
-          {
-            error: "User not found",
-            hint: "Make sure the user ID exists in the database",
+    // ============================================
+    // DATABASE MODE - Use Prisma ORM
+    // ============================================
+    if (prisma) {
+      const { PrismaClient } = require("@prisma/client");
+      const prismaClient = new PrismaClient();
+
+      try {
+        // Find or create user by email
+        let user = await prismaClient.user.findUnique({
+          where: { email: userId },
+        });
+
+        if (!user) {
+          user = await prismaClient.user.create({
+            data: {
+              email: userId,
+              name: userId.split('@')[0], // Extract name from email
+            },
+          });
+        }
+
+        // Create the post with platforms
+        const post = await prismaClient.post.create({
+          data: {
+            userId: user.id,
+            prompt: rawPrompt,
+            platforms: JSON.stringify(channels || ["Twitter / X"]),
           },
-          { status: 404 }
-        );
+        });
+
+        // Create the generated content linked to the post
+        const content = await prismaClient.generatedContent.create({
+          data: {
+            postId: post.id,
+            userId: user.id,
+            twitterThread: JSON.stringify(generatedContent.twitterThread),
+            linkedinPost: generatedContent.linkedinPost,
+          },
+        });
+
+        return NextResponse.json({
+          id: post.id,
+          userId: user.id,
+          prompt: post.prompt,
+          platforms: post.platforms,
+          createdAt: post.createdAt,
+          generatedContent: {
+            twitterThread: generatedContent.twitterThread,
+            linkedinPost: generatedContent.linkedinPost,
+          },
+          mode: "database",
+        }, { status: 201 });
+      } finally {
+        await prismaClient.$disconnect();
       }
     }
-    // In mock mode, we skip user validation and accept any userId string
 
-    // Create the post with PENDING status
-    // In mock mode, we also generate AI content immediately
-    const isMockMode = !prisma;
-    const generatedContent = isMockMode ? generateMockAiContent(rawPrompt) : null;
-
-    const postResult = await db.post.create({
-      data: {
-        userId,
-        rawPrompt,
-        generatedAi: generatedContent ? JSON.stringify(generatedContent) : "",
-        status: "PENDING",
-        scheduledAt: new Date(scheduledAt),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
-    }) as {
-      id: string;
-      userId: string;
-      rawPrompt: string;
-      generatedAi: string;
-      status: string;
-      scheduledAt: Date;
-      user?: { id: string; email: string; name: string | null };
-    };
-
-    // In mock mode, return the generated content alongside the post
-    if (isMockMode) {
-      return NextResponse.json({
-        id: postResult.id,
-        userId: postResult.userId,
-        rawPrompt: postResult.rawPrompt,
-        generatedAi: postResult.generatedAi,
-        status: postResult.status,
-        scheduledAt: postResult.scheduledAt,
-        generatedContent,
-        mode: "mock",
-      }, { status: 201 });
+    // ============================================
+    // MOCK MODE - Use in-memory storage
+    // ============================================
+    const postId = crypto.randomUUID();
+    
+    // Create user if not exists in mock
+    if (!mockUsers.find(u => u.id === userId)) {
+      mockUsers.push({
+        id: userId,
+        email: userId,
+        name: userId.split('@')[0],
+        createdAt: new Date(),
+      });
     }
 
-    return NextResponse.json(postResult, { status: 201 });
+    // Store post in mock
+    mockPosts.push({
+      id: postId,
+      rawPrompt: rawPrompt,
+      generatedAi: JSON.stringify(generatedContent),
+      status: "PENDING",
+      scheduledAt: new Date(scheduledAt),
+      userId: userId,
+    });
+
+    return NextResponse.json({
+      id: postId,
+      userId: userId,
+      prompt: rawPrompt,
+      platforms: channels || ["Twitter / X"],
+      generatedContent,
+      mode: "mock",
+    }, { status: 201 });
   } catch (error) {
     console.error("Error creating post:", error);
     return NextResponse.json(
