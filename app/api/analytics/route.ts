@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { handleApiError, jsonError, jsonSuccess } from "@/lib/api/response";
 import { resolveRequestUser } from "@/lib/auth/session";

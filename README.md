@@ -64,9 +64,33 @@ All authenticated routes accept `x-user-email` header or NextAuth session.
 - **DispatchAnalytics** — clicks, engagements, impressions
 - **Template** — reusable content frameworks (seeded)
 
-## Deploy (Vercel + Neon)
+## Deploy on Vercel
 
-1. Create a Neon PostgreSQL database
-2. Add env vars in Vercel: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`
-3. Run migrations: `npx prisma migrate deploy`
-4. Seed templates: `npm run db:seed`
+### 1. Create a PostgreSQL database
+
+Use [Neon](https://neon.tech) (recommended) or Supabase. Copy the **pooled** connection string.
+
+### 2. Add environment variables in Vercel
+
+Go to **Project → Settings → Environment Variables** and add for **Production** and **Preview**:
+
+| Variable | Example |
+|----------|---------|
+| `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require` |
+| `AUTH_SECRET` | Run `openssl rand -base64 32` |
+| `AUTH_URL` | `https://your-app.vercel.app` |
+
+Redeploy after saving env vars.
+
+### 3. Run database migrations (one time)
+
+From your machine with `DATABASE_URL` set to the production DB:
+
+```bash
+npx prisma migrate deploy
+npm run db:seed
+```
+
+### 4. Deploy
+
+Push to GitHub — Vercel will build automatically. The build does **not** require `DATABASE_URL` at compile time; it is only needed at **runtime** when API routes execute.
