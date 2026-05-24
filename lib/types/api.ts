@@ -63,9 +63,32 @@ export type TemplateItem = {
   useCount: number;
 };
 
+export type PlatformResult = {
+  platform: string;
+  status: string;
+  postUrl: string | null;
+  errorMessage: string | null;
+};
+
+export type IntegrationItem = {
+  platform: string;
+  connected: boolean;
+  accountName: string | null;
+  tokenPreview: string | null;
+  externalId: string | null;
+  updatedAt: string | null;
+};
+
 export type PublishResponse = {
   dispatchId: string;
+  status: string;
   message: string;
   distributedTo: string[];
   generatedPost: GeneratedPostResponse;
+  platformResults: PlatformResult[];
+  analytics: {
+    impressions: number;
+    engagements: number;
+    clicks: number;
+  } | null;
 };

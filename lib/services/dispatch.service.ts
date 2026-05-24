@@ -1,65 +1,10 @@
 import type { DispatchStatus } from "@prisma/client";
-import { generatePlatformContent } from "@/lib/ai/generate-content";
 import { prisma } from "@/lib/prisma";
+import { runPublishPipeline } from "@/lib/services/publish.service";
 import type { PublishInput } from "@/lib/validations";
 
 export async function createDispatch(userId: string, input: PublishInput) {
-  const dispatch = await prisma.dispatch.create({
-    data: {
-      userId,
-      content: input.content,
-      contentType: input.contentType,
-      selectedPlatforms: input.channels,
-      status: "PROCESSING",
-    },
-  });
-
-  try {
-    const generated = generatePlatformContent(
-      input.content,
-      input.contentType,
-      input.channels
-    );
-
-    const [updatedDispatch] = await prisma.$transaction([
-      prisma.dispatch.update({
-        where: { id: dispatch.id },
-        data: { status: "SUCCESS" },
-      }),
-      prisma.generatedPost.create({
-        data: {
-          dispatchId: dispatch.id,
-          twitterThread: generated.twitterThread,
-          linkedinPost: generated.linkedinPost,
-          metadata: generated.metadata,
-        },
-      }),
-      prisma.dispatchAnalytics.create({
-        data: {
-          dispatchId: dispatch.id,
-          clicks: 0,
-          engagements: 0,
-          impressions: 0,
-        },
-      }),
-    ]);
-
-    const result = await prisma.dispatch.findUnique({
-      where: { id: updatedDispatch.id },
-      include: {
-        generatedPost: true,
-        analytics: true,
-      },
-    });
-
-    return result!;
-  } catch (error) {
-    await prisma.dispatch.update({
-      where: { id: dispatch.id },
-      data: { status: "FAILED" },
-    });
-    throw error;
-  }
+  return runPublishPipeline(userId, input);
 }
 
 export async function getDispatchHistory(userId: string) {
@@ -69,6 +14,7 @@ export async function getDispatchHistory(userId: string) {
     include: {
       generatedPost: true,
       analytics: true,
+      platformPublishes: true,
     },
   });
 }
@@ -79,6 +25,7 @@ export async function getDispatchById(userId: string, dispatchId: string) {
     include: {
       generatedPost: true,
       analytics: true,
+      platformPublishes: true,
       user: {
         select: { id: true, email: true, name: true },
       },
@@ -95,7 +42,7 @@ export async function getGeneratedPosts(userId: string, dispatchId?: string) {
   return prisma.dispatch.findMany({
     where: { userId, status: "SUCCESS" },
     orderBy: { createdAt: "desc" },
-    include: { generatedPost: true },
+    include: { generatedPost: true, platformPublishes: true },
   });
 }
 

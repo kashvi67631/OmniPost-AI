@@ -15,6 +15,13 @@ enum DispatchStatus {
   FAILED
 }
 
+enum PlatformPublishStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+  SKIPPED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -25,25 +32,27 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  dispatches Dispatch[]
-  templates  Template[]
-  accounts   Account[]
-  sessions   Session[]
+  dispatches            Dispatch[]
+  templates             Template[]
+  accounts              Account[]
+  sessions              Session[]
+  platformConnections   PlatformConnection[]
 }
 
 model Dispatch {
   id                String         @id @default(uuid())
   userId            String
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content           String
+  content           String         @db.Text
   contentType       String         @default("Article")
   selectedPlatforms String[]
   status            DispatchStatus @default(PENDING)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  generatedPost GeneratedPost?
-  analytics     DispatchAnalytics?
+  generatedPost     GeneratedPost?
+  analytics         DispatchAnalytics?
+  platformPublishes PlatformPublish[]
 
   @@index([userId])
   @@index([status])
@@ -71,6 +80,42 @@ model DispatchAnalytics {
   updatedAt   DateTime @updatedAt
 }
 
+model PlatformPublish {
+  id           String                @id @default(uuid())
+  dispatchId   String
+  dispatch     Dispatch              @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  platform     String
+  externalId   String?
+  postUrl      String?
+  status       PlatformPublishStatus @default(PENDING)
+  errorMessage String?
+  publishedAt  DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([dispatchId, platform])
+  @@index([dispatchId])
+  @@index([platform])
+}
+
+model PlatformConnection {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform     String
+  accessToken  String    @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  externalId   String?
+  accountName  String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, platform])
+  @@index([userId])
+}
+
 model Template {
   id          String   @id @default(uuid())
   userId      String?
@@ -87,7 +132,6 @@ model Template {
   @@index([isSystem])
 }
 
-// NextAuth.js models
 model Account {
   id                String  @id @default(uuid())
   userId            String

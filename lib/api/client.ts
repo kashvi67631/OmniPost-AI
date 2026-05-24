@@ -90,3 +90,46 @@ export async function fetchPosts(email: string, dispatchId?: string) {
     response
   );
 }
+
+export async function fetchIntegrations(email: string) {
+  const response = await fetch("/api/integrations", {
+    headers: headers(email),
+  });
+  return parseJson<{
+    integrations: import("@/lib/types/api").IntegrationItem[];
+  }>(response);
+}
+
+export async function saveIntegrations(
+  email: string,
+  data: {
+    twitterAccessToken?: string;
+    twitterUsername?: string;
+    twitterUserId?: string;
+    linkedinAccessToken?: string;
+    linkedinPersonUrn?: string;
+    linkedinAccountName?: string;
+  }
+) {
+  const response = await fetch("/api/integrations", {
+    method: "PUT",
+    headers: headers(email),
+    body: JSON.stringify({ email, ...data }),
+  });
+  return parseJson<{
+    integrations: import("@/lib/types/api").IntegrationItem[];
+  }>(response);
+}
+
+export async function disconnectIntegration(
+  email: string,
+  platform: "twitter" | "linkedin"
+) {
+  const response = await fetch(
+    `/api/integrations?platform=${platform}`,
+    { method: "DELETE", headers: headers(email) }
+  );
+  return parseJson<{
+    integrations: import("@/lib/types/api").IntegrationItem[];
+  }>(response);
+}

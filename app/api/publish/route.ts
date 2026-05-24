@@ -20,10 +20,26 @@ export async function POST(request: NextRequest) {
       return jsonError("Unauthorized for this email.", 403);
     }
 
-    const dispatch = await createDispatch(resolvedUser.id, input);
+    const { dispatch, platformResults, generated } = await createDispatch(
+      resolvedUser.id,
+      input
+    );
 
     if (!dispatch.generatedPost) {
       return jsonError("Failed to generate content.", 500);
+    }
+
+    const published = platformResults.filter((r) => r.status === "PUBLISHED");
+    const skipped = platformResults.filter((r) => r.status === "SKIPPED");
+    const failed = platformResults.filter((r) => r.status === "FAILED");
+
+    let message = `Content generated with ${generated.metadata.provider}.`;
+    if (published.length > 0) {
+      message = `Live on ${published.map((p) => p.platform).join(" and ")}!`;
+    } else if (skipped.length > 0) {
+      message = `Generated — connect ${skipped.map((p) => p.platform).join(" & ")} in Settings → Integrations to publish live.`;
+    } else if (failed.length > 0) {
+      message = `Generated, but publishing failed: ${failed[0]?.errorMessage ?? "unknown error"}`;
     }
 
     const twitterThread = dispatch.generatedPost.twitterThread as string[];
@@ -31,8 +47,9 @@ export async function POST(request: NextRequest) {
     return jsonSuccess(
       {
         dispatchId: dispatch.id,
+        status: dispatch.status,
         distributedTo: dispatch.selectedPlatforms,
-        message: `Dispatched Live to ${dispatch.selectedPlatforms.join(" and ")}!`,
+        message,
         generatedPost: {
           dispatchId: dispatch.id,
           twitterThread,
@@ -40,6 +57,19 @@ export async function POST(request: NextRequest) {
           metadata: dispatch.generatedPost.metadata as Record<string, unknown> | null,
           createdAt: dispatch.generatedPost.createdAt.toISOString(),
         },
+        platformResults: platformResults.map((r) => ({
+          platform: r.platform,
+          status: r.status,
+          postUrl: r.postUrl ?? null,
+          errorMessage: r.errorMessage ?? null,
+        })),
+        analytics: dispatch.analytics
+          ? {
+              impressions: dispatch.analytics.impressions,
+              engagements: dispatch.analytics.engagements,
+              clicks: dispatch.analytics.clicks,
+            }
+          : null,
       },
       201
     );

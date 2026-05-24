@@ -25,6 +25,8 @@ Set:
 - `DATABASE_URL` — PostgreSQL connection string
 - `AUTH_SECRET` — run `openssl rand -base64 32`
 - `AUTH_URL` — `http://localhost:3000` for local dev
+- `OPENAI_API_KEY` — enables real AI copy (falls back to rules if unset)
+- `TWITTER_ACCESS_TOKEN` / `LINKEDIN_ACCESS_TOKEN` — optional server-wide publish tokens, or connect per-user in **Settings → Integrations**
 
 ### 2. Database
 
@@ -46,7 +48,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Route | Method | Description |
 |-------|--------|-------------|
-| `/api/publish` | POST | Create dispatch, generate posts, persist to DB |
+| `/api/publish` | POST | OpenAI generation, platform publish, analytics |
+| `/api/integrations` | GET/PUT/DELETE | Twitter & LinkedIn tokens per user |
 | `/api/history` | GET | List user dispatch history |
 | `/api/analytics` | GET | Aggregated KPIs and charts |
 | `/api/posts` | GET | Generated posts (optional `?dispatchId=`) |
@@ -61,7 +64,9 @@ All authenticated routes accept `x-user-email` header or NextAuth session.
 - **User** — id, name, email, image, timezone, company
 - **Dispatch** — content, platforms, status, user relation
 - **GeneratedPost** — twitterThread, linkedinPost, metadata
-- **DispatchAnalytics** — clicks, engagements, impressions
+- **DispatchAnalytics** — clicks, engagements, impressions (updated on live publish)
+- **PlatformPublish** — per-platform status, external IDs, post URLs
+- **PlatformConnection** — user OAuth tokens for Twitter & LinkedIn
 - **Template** — reusable content frameworks (seeded)
 
 ## Deploy on Vercel
@@ -79,6 +84,11 @@ Go to **Project → Settings → Environment Variables** and add for **Productio
 | `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require` |
 | `AUTH_SECRET` | Run `openssl rand -base64 32` |
 | `AUTH_URL` | `https://your-app.vercel.app` |
+| `OPENAI_API_KEY` | Your OpenAI API key |
+| `OPENAI_MODEL` | Optional, default `gpt-4o-mini` |
+| `TWITTER_ACCESS_TOKEN` | Optional global X API token |
+| `LINKEDIN_ACCESS_TOKEN` | Optional global LinkedIn token |
+| `LINKEDIN_PERSON_URN` | `urn:li:person:…` for LinkedIn author |
 
 Redeploy after saving env vars.
 
