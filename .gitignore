@@ -1,7 +1,11 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# ⚠️ SECRETS — never commit (DB URL, API keys, AUTH_SECRET)
+.env
+.env.local
+
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,7 +18,7 @@
 /coverage
 
 # next.js
-/.next/
+.next
 /out/
 
 # production
@@ -30,8 +34,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# other env variants (keep .env.example committable)
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
