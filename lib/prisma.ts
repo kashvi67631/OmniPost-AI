@@ -1,16 +1,11 @@
-import path from "path";
-import { config } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
-
-config({ path: path.resolve(process.cwd(), ".env.local") });
-config({ path: path.resolve(process.cwd(), ".env") });
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function createPrismaClient() {
+function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
@@ -34,7 +29,8 @@ function getPrismaClient(): PrismaClient {
 }
 
 /**
- * Lazy Prisma client — does not connect at import time (safe for Vercel builds).
+ * Singleton Prisma client via globalThis (dev hot-reload safe).
+ * Proxy defers instantiation until first query — never connects at import/build time.
  */
 export const prisma = new Proxy({} as PrismaClient, {
   get(_target, prop) {
